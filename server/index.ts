@@ -29,6 +29,7 @@ type Booking = {
 
 const slots: Slot[] = generateSlots();
 const bookings: Booking[] = [];
+const reserved = new Set<string>();
 
 function generateSlots(): Slot[] {
   // 24 slots, one per hour starting today 00:00 UTC
@@ -52,11 +53,10 @@ const app = express();
 app.use(express.json());
 
 app.get("/api/slots", (_req: Request, res: Response) => {
-  const taken = new Set(bookings.map((b) => b.slotId));
-  // Filter out slots from earlier today using the date prefix
-  const today = new Date().toISOString().slice(0, 10);
+  const taken = new Set([...bookings.map((b) => b.slotId), ...reserved]);
+  const now = new Date().toISOString();
   const available = slots
-    .filter((s) => s.startsAt > today)
+    .filter((s) => s.startsAt > now)
     .map((s) => ({ ...s, taken: taken.has(s.id) }));
   res.json({ slots: available });
 });
@@ -73,11 +73,13 @@ app.post("/api/bookings", (req: Request, res: Response) => {
   const slot = slots.find((s) => s.id === slotId);
   if (!slot) return res.status(404).json({ error: "slot not found" });
 
-  // Is it already taken?
-  const alreadyBooked = bookings.some((b) => b.slotId === slotId);
+  // Reserve synchronously so concurrent requests cannot both succeed
+  const alreadyBooked =
+    bookings.some((b) => b.slotId === slotId) || reserved.has(slotId);
   if (alreadyBooked) {
     return res.status(409).json({ error: "slot already booked" });
   }
+  reserved.add(slotId);
 
   // Simulate the latency of writing to a database
   setTimeout(() => {
