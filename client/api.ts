@@ -24,8 +24,22 @@ export async function createBooking(input: {
   return r.json();
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatUtcOffset(date: Date): string {
+  // getTimezoneOffset: minutes to add to local to get UTC (e.g. BRT => 180)
+  const offsetMin = -date.getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  return `UTC${sign}${pad2(Math.floor(abs / 60))}:${pad2(abs % 60)}`;
+}
+
 export function formatSlot(startsAtIso: string): string {
-  // Display in the user's local time (keep the UTC Z so Date parses correctly)
   const d = new Date(startsAtIso);
-  return d.toLocaleString();
+  if (Number.isNaN(d.getTime())) return startsAtIso;
+
+  const local = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return `${local} (${formatUtcOffset(d)})`;
 }
